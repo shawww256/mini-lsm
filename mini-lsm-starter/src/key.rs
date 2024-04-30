@@ -4,7 +4,7 @@ use bytes::Bytes;
 
 pub const TS_ENABLED: bool = false;
 
-pub struct Key<T: AsRef<[u8]>>(T);
+pub struct Key<T: AsRef<[u8]>>(pub T);
 
 pub type KeySlice<'a> = Key<&'a [u8]>;
 pub type KeyVec = Key<Vec<u8>>;
@@ -111,6 +111,7 @@ impl<'a> Key<&'a [u8]> {
     }
 
     /// Always use `raw_ref` to access the key in week 1 + 2. This function will be removed in week 3.
+    /// 返回一个对字节切片的引用
     pub fn raw_ref(self) -> &'a [u8] {
         self.0
     }

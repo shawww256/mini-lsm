@@ -11,6 +11,7 @@ pub trait StorageIterator {
     fn value(&self) -> &[u8];
 
     /// Get the current key.
+    //fn key(&self) -> Self::KeyType<'_>;
     fn key(&self) -> Self::KeyType<'_>;
 
     /// Check if the current iterator is valid.

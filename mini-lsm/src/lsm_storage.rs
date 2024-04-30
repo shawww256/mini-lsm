@@ -455,7 +455,7 @@ impl LsmStorageInner {
         // Search on the current memtable.
         if let Some(value) = snapshot.memtable.get(key) {
             if value.is_empty() {
-                // found tomestone, return key not exists
+                // found tombstone, return key not exists
                 return Ok(None);
             }
             return Ok(Some(value));
