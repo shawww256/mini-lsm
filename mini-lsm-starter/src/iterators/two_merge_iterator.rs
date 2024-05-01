@@ -97,6 +97,7 @@ impl<
 
     // 获取当前迭代器中活跃的迭代器数量
     //（即至少有一个元素可以迭代的迭代器数量）
+    // impl in W1D6T3
     fn num_active_iterators(&self) -> usize {
         self.a.num_active_iterators() + self.b.num_active_iterators()
     }
