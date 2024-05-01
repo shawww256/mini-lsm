@@ -157,7 +157,7 @@ pub struct SsTable {
     block_cache: Option<Arc<BlockCache>>,
     first_key: KeyBytes,
     last_key: KeyBytes,
-    //pub(crate) bloom: Option<Bloom>,
+    pub(crate) bloom: Option<Bloom>,
     /// The maximum timestamp stored in this SST, implemented in week 3.
     max_ts: u64,
 }
@@ -172,12 +172,12 @@ impl SsTable {
     pub fn open(id: usize, block_cache: Option<Arc<BlockCache>>, file: FileObject) -> Result<Self> {
         //unimplemented!()
         let len = file.size();
-        // let raw_bloom_offset = file.read(len - 4, 4)?;
-        // let bloom_offset = (&raw_bloom_offset[..]).get_u32() as u64;
-        // let raw_bloom = file.read(bloom_offset, len - 4 - bloom_offset)?;
-        // let bloom_filter = Bloom::decode(&raw_bloom)?;
-        // let raw_meta_offset = file.read(bloom_offset - 4, 4)?;
-        let raw_meta_offset = file.read(len - 4, 4)?;
+        let raw_bloom_offset = file.read(len - 4, 4)?;
+        let bloom_offset = (&raw_bloom_offset[..]).get_u32() as u64;
+        let raw_bloom = file.read(bloom_offset, len - 4 - bloom_offset)?;
+        let bloom_filter = Bloom::decode(&raw_bloom)?;
+        let raw_meta_offset = file.read(bloom_offset - 4, 4)?;
+        //let raw_meta_offset = file.read(len - 4, 4)?;
         let block_meta_offset = (&raw_meta_offset[..]).get_u32() as u64;
         // let raw_meta = file.read(block_meta_offset, bloom_offset - 4 - block_meta_offset)?;
         let raw_meta = file.read(block_meta_offset, len - 4 - block_meta_offset)?;
@@ -190,7 +190,7 @@ impl SsTable {
             block_meta_offset: block_meta_offset as usize,
             id,
             block_cache,
-            //bloom: Some(bloom_filter),
+            bloom: Some(bloom_filter),
             max_ts: 0,
         })
     }
@@ -210,7 +210,7 @@ impl SsTable {
             block_cache: None,
             first_key,
             last_key,
-            //bloom: None,
+            bloom: None,
             max_ts: 0,
         }
     }
