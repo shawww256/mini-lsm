@@ -16,7 +16,7 @@ use crate::table::SsTableIterator;
 //type LsmIteratorInner = MergeIterator<MemTableIterator>;
 type LsmIteratorInner = TwoMergeIterator<
     TwoMergeIterator<MergeIterator<MemTableIterator>, MergeIterator<SsTableIterator>>,
-    SstConcatIterator,
+    MergeIterator<SstConcatIterator>,
 >;
 
 pub struct LsmIterator {

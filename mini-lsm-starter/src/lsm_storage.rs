@@ -414,17 +414,21 @@ impl LsmStorageInner {
             }
         }
         let l0_iter = MergeIterator::create(l0_iters);
-        let mut l1_ssts = Vec::with_capacity(snapshot.levels[0].1.len());
-        for table in snapshot.levels[0].1.iter() {
-            let table = snapshot.sstables[table].clone();
-            if keep_table(key, &table) {
-                l1_ssts.push(table);
+        let mut level_iters = Vec::with_capacity(snapshot.levels.len());
+        for (_, level_sst_ids) in &snapshot.levels {
+            let mut level_ssts = Vec::with_capacity(snapshot.levels[0].1.len());
+            for table in level_sst_ids {
+                let table = snapshot.sstables[table].clone();
+                if keep_table(key, &table) {
+                    level_ssts.push(table);
+                }
             }
+            let level_iter =
+                SstConcatIterator::create_and_seek_to_key(level_ssts, KeySlice::from_slice(key))?;
+            level_iters.push(Box::new(level_iter));
         }
-        let l1_iter =
-            SstConcatIterator::create_and_seek_to_key(l1_ssts, KeySlice::from_slice(key))?;
+        let iter = TwoMergeIterator::create(l0_iter, MergeIterator::create(level_iters))?;
 
-        let iter = TwoMergeIterator::create(l0_iter, l1_iter)?;
         if iter.is_valid() && iter.key().raw_ref() == key && !iter.value().is_empty() {
             return Ok(Some(Bytes::copy_from_slice(iter.value())));
         }
@@ -643,42 +647,47 @@ impl LsmStorageInner {
                 table_iters.push(Box::new(iter));
             }
         }
-            // 创建一个合并迭代器 `l0_iter`，它将用于迭代属于L0层级的多个SSTable。
+        // 创建一个合并迭代器 `l0_iter`，它将用于迭代属于L0层级的多个SSTable。
         let l0_iter = MergeIterator::create(table_iters);
-
-        // 初始化一个向量 `l1_ssts`，用于存储L1层级的SSTable。
-        let mut l1_ssts = Vec::with_capacity(snapshot.levels[0].1.len());
-        // 遍历快照中L1层级的SSTable。
-        for table in snapshot.levels[0].1.iter() {
-        // 从快照的SSTable映射中克隆当前的SSTable。
-        let table = snapshot.sstables[table].clone();
-        // 检查当前SSTable的键范围是否与查询范围重叠。
-        if range_overlap(lower, upper, table.first_key().as_key_slice(), table.last_key().as_key_slice()) {
-            // 如果重叠，将SSTable添加到 `l1_ssts` 向量中。
-            l1_ssts.push(table);
-        }
-        }
-
-        // 根据提供的下界 `lower` 创建一个串联迭代器 `l1_iter`，该迭代器将用于迭代L1层级的SSTable。
-        let l1_iter = match lower {
-        Bound::Included(key) => { // 如果下界是包含的（即查找的起始键是包含在范围内的）。
-            SstConcatIterator::create_and_seek_to_key(l1_ssts, KeySlice::from_slice(key))? // 创建并定位到给定键的迭代器。
-        }
-        Bound::Excluded(key) => { // 如果下界是排除的（即查找的起始键不包含在范围内）。
-            let mut iter = SstConcatIterator::create_and_seek_to_key(l1_ssts, KeySlice::from_slice(key))?; // 创建迭代器并定位到给定键。
-            // 如果当前迭代器有效并且键等于给定的排除键，则移动到下一个键值对。
-            if iter.is_valid() && iter.key().raw_ref() == key {
-                iter.next()?;
+        let mut level_iters = Vec::with_capacity(snapshot.levels.len());
+        for (_, level_sst_ids) in &snapshot.levels {
+            let mut level_ssts = Vec::with_capacity(level_sst_ids.len());
+            for table in level_sst_ids {
+                let table = snapshot.sstables[table].clone();
+                if range_overlap(
+                    lower,
+                    upper,
+                    table.first_key().as_key_slice(),
+                    table.last_key().as_key_slice(),
+                ) {
+                    level_ssts.push(table);
+                }
             }
-            iter // 返回调整后的迭代器。
+
+            let level_iter = match lower {
+                Bound::Included(key) => SstConcatIterator::create_and_seek_to_key(
+                    level_ssts,
+                    KeySlice::from_slice(key),
+                )?,
+                Bound::Excluded(key) => {
+                    let mut iter = SstConcatIterator::create_and_seek_to_key(
+                        level_ssts,
+                        KeySlice::from_slice(key),
+                    )?;
+                    if iter.is_valid() && iter.key().raw_ref() == key {
+                        iter.next()?;
+                    }
+                    iter
+                }
+                Bound::Unbounded => SstConcatIterator::create_and_seek_to_first(level_ssts)?,
+            };
+            level_iters.push(Box::new(level_iter));
         }
-        Bound::Unbounded => SstConcatIterator::create_and_seek_to_first(l1_ssts)?, // 如果下界是无界的，则创建并定位到第一个键值对的迭代器。
-        };
 
         // 创建一个两级合并迭代器 `iter`，首先合并内存表 `memtable_iter` 和 L0层级的迭代器 `l0_iter`。
         let iter = TwoMergeIterator::create(memtable_iter, l0_iter)?;
         // 再次使用两级合并迭代器，将上一步得到的迭代器与L1层级的迭代器 `l1_iter` 合并。
-        let iter = TwoMergeIterator::create(iter, l1_iter)?;
+        let iter = TwoMergeIterator::create(iter, MergeIterator::create(level_iters))?;
         Ok(FusedIterator::new(LsmIterator::new(
             iter,
             map_bound(upper),
