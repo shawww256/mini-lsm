@@ -86,14 +86,8 @@ impl TieredCompactionController {
                     "compaction triggered by size ratio: {}",
                     current_size_ratio * 100.0
                 );
-                println!(
-                    "next level id is: {}",
-                    id+1
-                );
-                println!(
-                    "next level size is: {}",
-                    next_level_size
-                );
+                println!("next level id is: {}", id + 1);
+                println!("next level size is: {}", next_level_size);
                 // 返回一个压缩任务，包括从第一层到 id + 2 层的所有层级
                 // 最底层是否包括取决于 id + 2 是否大于或等于 snapshot.levels.len()
                 return Some(TieredCompactionTask {
