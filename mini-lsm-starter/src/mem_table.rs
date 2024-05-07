@@ -51,25 +51,25 @@ impl MemTable {
 
     /// Create a new mem-table with WAL
     pub fn create_with_wal(id: usize, path: impl AsRef<Path>) -> Result<Self> {
-        unimplemented!()
-        // Ok(Self {
-        //     id,
-        //     map: Arc::new(SkipMap::new()),
-        //     wal: Some(Wal::create(path.as_ref())?),
-        //     approximate_size: Arc::new(AtomicUsize::new(0)),
-        // })
+        //unimplemented!()
+        Ok(Self {
+            id,
+            map: Arc::new(SkipMap::new()),
+            wal: Some(Wal::create(path.as_ref())?),
+            approximate_size: Arc::new(AtomicUsize::new(0)),
+        })
     }
 
     /// Create a memtable from WAL
     pub fn recover_from_wal(id: usize, path: impl AsRef<Path>) -> Result<Self> {
-        unimplemented!()
-        // let map = Arc::new(SkipMap::new());
-        // Ok(Self {
-        //     id,
-        //     wal: Some(Wal::recover(path.as_ref(), &map)?),
-        //     map,
-        //     approximate_size: Arc::new(AtomicUsize::new(0)),
-        // })
+        //unimplemented!()
+        let map = Arc::new(SkipMap::new());
+        Ok(Self {
+            id,
+            wal: Some(Wal::recover(path.as_ref(), &map)?),
+            map,
+            approximate_size: Arc::new(AtomicUsize::new(0)),
+        })
     }
 
     pub fn for_testing_put_slice(&self, key: &[u8], value: &[u8]) -> Result<()> {
@@ -107,9 +107,9 @@ impl MemTable {
             .fetch_add(estimated_size, std::sync::atomic::Ordering::Relaxed);
         //原子地将 estimated_size 的值加到 self.approximate_size 的当前值上,并返回 self.approximate_size 在加法操作之前的原始值。
         //由于使用了 Ordering::Relaxed，这个操作不会对其他内存操作产生任何顺序上的约束，它仅仅是一个原子的加法操作。这在一些场景下是可接受的，尤其是在那些不依赖于内存顺序来保证程序逻辑正确性的场景。
-        // if let Some(ref wal) = self.wal {
-        //     wal.put(key, value)?;
-        // }
+        if let Some(ref wal) = self.wal {
+            wal.put(key, value)?;
+        }
         Ok(())
     }
 
