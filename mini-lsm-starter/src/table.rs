@@ -1,6 +1,3 @@
-#![allow(unused_variables)] // TODO(you): remove this lint after implementing this mod
-#![allow(dead_code)] // TODO(you): remove this lint after implementing this mod
-
 pub(crate) mod bloom;
 mod builder;
 mod iterator;
@@ -55,7 +52,7 @@ impl BlockMeta {
             estimated_size += meta.last_key.len();
         }
         // 最后加上一个u32的字节大小，用于存储CRC校验码
-        //estimated_size += std::mem::size_of::<u32>();
+        estimated_size += std::mem::size_of::<u32>();
         // Reserve the space to improve performance, especially when the size of incoming data is
         // large
         // 在向量中预分配预估大小的空间，以提高性能
@@ -71,7 +68,7 @@ impl BlockMeta {
             buf.put_u16(meta.last_key.len() as u16);
             buf.put_slice(meta.last_key.raw_ref());
         }
-        //buf.put_u32(crc32fast::hash(&buf[original_len + 4..]));
+        buf.put_u32(crc32fast::hash(&buf[original_len + 4..]));
         assert_eq!(estimated_size, buf.len() - original_len);
     }
 
@@ -83,7 +80,7 @@ impl BlockMeta {
         let mut block_meta = Vec::new();
         // 从缓冲区中读取 u32 类型的数据，将其作为 usize 类型，代表 BlockMeta 对象的数量
         let num = buf.get_u32() as usize;
-        //let checksum = crc32fast::hash(&buf[..buf.remaining() - 4]);
+        let checksum = crc32fast::hash(&buf[..buf.remaining() - 4]);
         // 遍历从 0 到 num，对每个 BlockMeta 对象进行解码
         for _ in 0..num {
             // 从缓冲区中读取 u32 类型的数据，转换为 usize 类型，作为块的偏移量
@@ -102,9 +99,9 @@ impl BlockMeta {
                 last_key,
             });
         }
-        // if buf.get_u32() != checksum {
-        //     bail!("meta checksum mismatched");
-        // }
+        if buf.get_u32() != checksum {
+            bail!("meta checksum mismatched");
+        }
 
         Ok(block_meta)
     }
@@ -179,8 +176,7 @@ impl SsTable {
         let raw_meta_offset = file.read(bloom_offset - 4, 4)?;
         //let raw_meta_offset = file.read(len - 4, 4)?;
         let block_meta_offset = (&raw_meta_offset[..]).get_u32() as u64;
-        // let raw_meta = file.read(block_meta_offset, bloom_offset - 4 - block_meta_offset)?;
-        let raw_meta = file.read(block_meta_offset, len - 4 - block_meta_offset)?;
+        let raw_meta = file.read(block_meta_offset, bloom_offset - 4 - block_meta_offset)?;
         let block_meta = BlockMeta::decode_block_meta(&raw_meta[..])?;
         Ok(Self {
             file,
@@ -224,19 +220,15 @@ impl SsTable {
             .get(block_idx + 1)
             .map_or(self.block_meta_offset, |x| x.offset);
         let block_len = offset_end - offset - 4;
-        // let block_data_with_chksum: Vec<u8> = self
-        //     .file
-        //     .read(offset as u64, (offset_end - offset) as u64)?;
-        // let block_data = &block_data_with_chksum[..block_len];
-        let block_data = self
+        let block_data_with_chksum: Vec<u8> = self
             .file
             .read(offset as u64, (offset_end - offset) as u64)?;
-        // let checksum = (&block_data_with_chksum[block_len..]).get_u32();
-        // if checksum != crc32fast::hash(block_data) {
-        //     bail!("block checksum mismatched");
-        // }
-        Ok(Arc::new(Block::decode(&block_data[..])))
-        //Ok(Arc::new(Block::decode(block_data)))
+        let block_data = &block_data_with_chksum[..block_len];
+        let checksum = (&block_data_with_chksum[block_len..]).get_u32();
+        if checksum != crc32fast::hash(block_data) {
+            bail!("block checksum mismatched");
+        }
+        Ok(Arc::new(Block::decode(block_data)))
     }
 
     /// Read a block from disk, with block cache. (Day 4)

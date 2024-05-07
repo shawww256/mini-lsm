@@ -1,6 +1,3 @@
-#![allow(unused_variables)] // TODO(you): remove this lint after implementing this mod
-#![allow(dead_code)] // TODO(you): remove this lint after implementing this mod
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -81,9 +78,9 @@ impl SsTableBuilder {
             first_key: std::mem::take(&mut self.first_key).into_key_bytes(),
             last_key: std::mem::take(&mut self.last_key).into_key_bytes(),
         });
-        //let checksum = crc32fast::hash(&encoded_block);
+        let checksum = crc32fast::hash(&encoded_block);
         self.data.extend(encoded_block);
-        //self.data.put_u32(checksum);
+        self.data.put_u32(checksum);
     }
 
     /// Builds the SSTable and writes it to the given path. Use the `FileObject` structure to manipulate the disk objects.
